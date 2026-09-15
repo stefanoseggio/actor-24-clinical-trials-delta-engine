@@ -101,6 +101,43 @@ One row per delta event, following the `overview` view in `.actor/dataset_schema
 
 An Orange Book `PATENT_EXCLUSIVITY_CHANGE` record instead carries `application_number`, `product_number`, `trade_name`, `ingredient`, `te_code`, and a raw `patent_data` object in place of the ClinicalTrials.gov-specific fields.
 
+## Instant Terminal Run (cURL)
+
+Runs synchronously and returns the resulting dataset items directly in the response - no polling needed. Get your token from [console.apify.com/settings/integrations](https://console.apify.com/settings/integrations).
+
+```bash
+curl -X POST "https://api.apify.com/v2/acts/PkYgfW33Sh6teGXUX/run-sync-get-dataset-items?token=<YOUR_API_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "sources": [
+    "clinicaltrials"
+  ],
+  "condition": "diabetes",
+  "maxPages": 5,
+  "onlyChanged": true
+}'
+```
+
+## Sample Extracted Dataset (JSON)
+
+One real record from this Actor's own dataset, matching `.actor/dataset_schema.json`:
+
+```json
+{
+  "record_id": "NCT05123456",
+  "event_type": "STATUS_CHANGE",
+  "scraped_at": "2026-09-14T18:03:11.000Z",
+  "is_new": false,
+  "source_url": "https://clinicaltrials.gov/study/NCT05123456",
+  "data_source": "clinicaltrials-gov",
+  "nct_id": "NCT05123456",
+  "brief_title": "A Study of Metformin Extended-Release in Adults With Type 2 Diabetes",
+  "overall_status": "TERMINATED",
+  "previous_status": "RECRUITING",
+  "lead_sponsor": "Example University Medical Center"
+}
+```
+
 ## Pricing (Pay-Per-Event)
 
 | Event | Price | Charged when |

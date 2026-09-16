@@ -4,16 +4,16 @@
 
 <p align="center">
   <a href="https://apify.com"><img alt="Built for Apify" src="https://img.shields.io/badge/Built%20for-Apify-FF9012?logo=apify&logoColor=white"></a>
-  <a href="#pricing-pay-per-event"><img alt="Pay-Per-Event" src="https://img.shields.io/badge/Pay--Per--Event-from%20%240.002-2ea44f"></a>
+  <a href="#cost--byok-disclosure"><img alt="Pay-Per-Event" src="https://img.shields.io/badge/Pay--Per--Event-from%20%240.002-2ea44f"></a>
   <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
 </p>
 
-## Run it
-
 <p align="center">
   <a href="https://apify.com/stefano_seggio/actor-24-clinical-trials-delta-engine"><img alt="Run on Apify Store" src="https://img.shields.io/badge/Run%20on-Apify%20Store-FF9012?logo=apify&logoColor=white&style=for-the-badge"></a>
 </p>
+
+Monitors ClinicalTrials.gov (global trial registry) and the US FDA Orange Book for status and patent/exclusivity changes, delivering only what changed on whichever schedule you configure via Apify's own Scheduler - there is no fixed built-in cadence.
 
 Live and public at [apify.com/stefano_seggio/actor-24-clinical-trials-delta-engine](https://apify.com/stefano_seggio/actor-24-clinical-trials-delta-engine). Owner console: [console.apify.com/actors/PkYgfW33Sh6teGXUX](https://console.apify.com/actors/PkYgfW33Sh6teGXUX).
 
@@ -50,9 +50,97 @@ flowchart TD
 
 Every page/extract fetch goes through a shared retry helper with full-jitter exponential backoff (default 5 attempts). The `clinicaltrials` source needs no API key; `orangebook` (via openFDA) works without one too, capped at 1,000 requests/day (240/min) - a free openFDA key raises that to 120,000/day at the same 240/min rate.
 
-## Features
+## Cost & BYOK Disclosure
 
-| Feature | Input field | What it does |
+This Actor bills on Apify's [Pay-Per-Event](https://apify.com/pricing) model - you pay only for what's actually delivered.
+
+| Event name | What triggers it | Price |
+|---|---|---|
+| `result` | A new or changed trial/patent record is delivered (`NEW_TRIAL`, `STATUS_CHANGE`, `NEW_LISTING`, or `PATENT_EXCLUSIVITY_CHANGE`) | $0.002 per record |
+| `actor-start` | Once per run, when the Actor starts | $0.00005 per run start |
+
+`SNAPSHOT_NO_DIFF` rows (only ever delivered when `onlyChanged: false`) are never charged - an unchanged trial or Orange Book product whose fingerprint matches what was stored on the previous run is suppressed before delivery, so it costs $0.00. It is not charged and then refunded; it is simply never charged. A daily delta run against a narrow `condition` filter that finds nothing new costs only its `actor-start` fee ($0.00005).
+
+**BYOK: none required.** This Actor needs no third-party API key to run. The optional `fdaApiKey` input exists solely to raise your own openFDA rate ceiling for the `orangebook` source (1,000 to 120,000 requests/day) - it is never required, never pooled, and has no effect on the `clinicaltrials` source at all.
+
+## Quickstart
+
+Three equivalent ways to run this Actor and get its dataset items back. Get your API token from [console.apify.com/settings/integrations](https://console.apify.com/settings/integrations).
+
+### cURL (synchronous, no polling)
+
+```bash
+curl -X POST "https://api.apify.com/v2/acts/PkYgfW33Sh6teGXUX/run-sync-get-dataset-items?token=<YOUR_API_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "sources": [
+    "clinicaltrials"
+  ],
+  "condition": "diabetes",
+  "maxPages": 5,
+  "onlyChanged": true
+}'
+```
+
+### Python (`apify-client`)
+
+```python
+# pip install apify-client
+# run_monitor.py - calls the ClinicalTrials + Orange Book Delta Actor via the Apify API.
+import os
+from apify_client import ApifyClient
+
+client = ApifyClient(os.environ["APIFY_TOKEN"])  # set this to your Apify API token
+
+run_input = {
+    "sources": ["clinicaltrials"],
+    "condition": "diabetes",
+    "maxPages": 5,
+    "onlyChanged": True,
+}
+
+run = client.actor("stefano_seggio/actor-24-clinical-trials-delta-engine").call(run_input=run_input)
+print(f"Run {run['id']} finished with status: {run['status']}")
+
+dataset_items = client.dataset(run["defaultDatasetId"]).list_items().items
+print(f"Delivered {len(dataset_items)} record(s):")
+for item in dataset_items:
+    print(f"- [{item['event_type']}] {item['record_id']}")
+```
+
+### Node.js (`apify-client`)
+
+```javascript
+// run-monitor.js - calls the ClinicalTrials + Orange Book Delta Actor via the Apify API.
+import { ApifyClient } from 'apify-client';
+
+const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
+
+const run = await client.actor('stefano_seggio/actor-24-clinical-trials-delta-engine').call({
+    sources: ['clinicaltrials'],
+    condition: 'diabetes',
+    maxPages: 5,
+    onlyChanged: true,
+});
+
+console.log(`Run ${run.id} finished with status: ${run.status}`);
+
+const { items } = await client.dataset(run.defaultDatasetId).listItems();
+console.log(`Delivered ${items.length} record(s):`);
+for (const item of items) {
+    console.log(`- [${item.event_type}] ${item.record_id}`);
+}
+```
+
+Runnable copies of the Python and Node.js examples above (CommonJS `require()` variant for Node) live in `examples/run_monitor.py` and `examples/run-monitor.js` in this repo.
+
+## Input & Output Schema
+
+This is a documentation/integration wrapper repo with no local `.actor/input_schema.json` - the field list below is the real, complete input surface as documented and exercised in this README's own Quickstart examples above.
+
+### Input
+
+| Field | Input field | What it does |
 | --- | --- | --- |
 | Multi-source monitoring | `sources` | Track ClinicalTrials.gov, the FDA Orange Book, or both in one run. |
 | Condition filter | `condition` | Passed to ClinicalTrials.gov's `query.cond` - e.g. `"diabetes"` to narrow the walk. |
@@ -62,22 +150,11 @@ Every page/extract fetch goes through a shared retry helper with full-jitter exp
 | Resilient retries | `maxRetries` | Full-jitter exponential backoff per page/extract fetch before it's dead-lettered (default 5, max 10). |
 | Optional openFDA key | `fdaApiKey` | Raises the Orange Book source's daily request ceiling from 1,000 to 120,000; not needed for `clinicaltrials`. |
 
-## Quick start
+### Output
 
-```bash
-apify call PkYgfW33Sh6teGXUX --input '{
-  "sources": ["clinicaltrials"],
-  "condition": "diabetes",
-  "maxPages": 5,
-  "onlyChanged": true
-}'
-```
+One row per delta event, following the `overview` view in `.actor/dataset_schema.json`.
 
-This walks up to 5 pages (up to 500 trials) matching "diabetes" on ClinicalTrials.gov, and delivers only trials that are new or whose status changed since the last run.
-
-## Sample output
-
-One row per delta event, following the `overview` view in `.actor/dataset_schema.json`:
+#### Sample Extracted Dataset (JSON)
 
 ```json
 {
@@ -101,50 +178,24 @@ One row per delta event, following the `overview` view in `.actor/dataset_schema
 
 An Orange Book `PATENT_EXCLUSIVITY_CHANGE` record instead carries `application_number`, `product_number`, `trade_name`, `ingredient`, `te_code`, and a raw `patent_data` object in place of the ClinicalTrials.gov-specific fields.
 
-## Instant Terminal Run (cURL)
+#### Field reference
 
-Runs synchronously and returns the resulting dataset items directly in the response - no polling needed. Get your token from [console.apify.com/settings/integrations](https://console.apify.com/settings/integrations).
-
-```bash
-curl -X POST "https://api.apify.com/v2/acts/PkYgfW33Sh6teGXUX/run-sync-get-dataset-items?token=<YOUR_API_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-  "sources": [
-    "clinicaltrials"
-  ],
-  "condition": "diabetes",
-  "maxPages": 5,
-  "onlyChanged": true
-}'
-```
-
-## Sample Extracted Dataset (JSON)
-
-One real record from this Actor's own dataset, matching `.actor/dataset_schema.json`:
-
-```json
-{
-  "record_id": "NCT05123456",
-  "event_type": "STATUS_CHANGE",
-  "scraped_at": "2026-09-14T18:03:11.000Z",
-  "is_new": false,
-  "source_url": "https://clinicaltrials.gov/study/NCT05123456",
-  "data_source": "clinicaltrials-gov",
-  "nct_id": "NCT05123456",
-  "brief_title": "A Study of Metformin Extended-Release in Adults With Type 2 Diabetes",
-  "overall_status": "TERMINATED",
-  "previous_status": "RECRUITING",
-  "lead_sponsor": "Example University Medical Center"
-}
-```
-
-## Pricing (Pay-Per-Event)
-
-| Event | Price | Charged when |
-| --- | --- | --- |
-| `result` | $0.002 per record | A new or changed trial/patent record is delivered (`NEW_TRIAL`, `STATUS_CHANGE`, `NEW_LISTING`, or `PATENT_EXCLUSIVITY_CHANGE`). |
-
-`SNAPSHOT_NO_DIFF` rows (only ever delivered when `onlyChanged: false`) are never charged. A daily delta run against a narrow `condition` filter that finds nothing new costs only its per-run start fee.
+| Field | Description |
+|---|---|
+| `record_id` | Stable identifier: the NCT number for a trial, or the Orange Book application/product number for a patent record. |
+| `event_type` | `NEW_TRIAL`, `STATUS_CHANGE`, `NEW_LISTING`, `PATENT_EXCLUSIVITY_CHANGE`, or (only if `onlyChanged: false`) `SNAPSHOT_NO_DIFF`. |
+| `scraped_at` | ISO-8601 timestamp of this run. |
+| `is_new` | `true` if this is the first time this `record_id` has been seen. |
+| `source_url` | Direct link back to the record on ClinicalTrials.gov or the Orange Book. |
+| `data_source` | `clinicaltrials-gov` or `orange-book`. |
+| `nct_id` | ClinicalTrials.gov trial identifier (trial records only). |
+| `brief_title` | The trial's short title (trial records only). |
+| `overall_status` | Current trial status, e.g. `RECRUITING`, `TERMINATED` (trial records only). |
+| `previous_status` | The status recorded on the prior run, present on `STATUS_CHANGE` events. |
+| `last_update_post_date` / `status_verified_date` | ClinicalTrials.gov's own recency fields for the trial record. |
+| `lead_sponsor` | The trial's lead sponsor organization. |
+| `conditions` / `phases` | The trial's studied condition(s) and phase(s). |
+| `application_number` / `product_number` / `trade_name` / `ingredient` / `te_code` / `patent_data` | Orange Book-specific fields, present only on `NEW_LISTING`/`PATENT_EXCLUSIVITY_CHANGE` records. |
 
 ## Why not just poll it yourself
 
@@ -158,66 +209,11 @@ One real record from this Actor's own dataset, matching `.actor/dataset_schema.j
 - **openFDA rate limits apply to the Orange Book source.** Without `fdaApiKey`, high-volume Orange Book runs may hit the 1,000 requests/day ceiling; the `clinicaltrials` source is unaffected since it doesn't use this key.
 - **No contractual support SLA.** Independently developed and maintained by Stefano Seggio (Delta Registry); issues and feature requests go through the Apify Store's Issues tab, typically triaged within 48 hours.
 
-## Node.js
+## Contributing & Local Setup
 
-```js
-// run-monitor.js
-// Calls the ClinicalTrials + Orange Book Delta Actor via the Apify API.
-const { ApifyClient } = require('apify-client');
+As disclosed above, this repository is a documentation and integration wrapper - the Actor's real scraping/delta-engine TypeScript source is proprietary and runs privately on Apify's platform, not checked into this repository. There is no `src/` here to clone and hack on.
 
-const client = new ApifyClient({
-    token: process.env.APIFY_TOKEN, // set this to your Apify API token
-});
-
-async function main() {
-    const input = {
-        sources: ['clinicaltrials'],
-        condition: 'diabetes',
-        maxPages: 5,
-        onlyChanged: true,
-    };
-
-    const run = await client.actor('PkYgfW33Sh6teGXUX').call(input);
-    console.log(`Run ${run.id} finished with status: ${run.status}`);
-
-    const { items } = await client.dataset(run.defaultDatasetId).listItems();
-    console.log(`Delivered ${items.length} record(s):`);
-    for (const item of items) {
-        console.log(`- [${item.event_type}] ${item.record_id}`);
-    }
-}
-
-main().catch((err) => {
-    console.error('Run failed:', err);
-    process.exit(1);
-});
-```
-
-## Python
-
-```python
-# run_monitor.py
-# Calls the ClinicalTrials + Orange Book Delta Actor via the Apify API.
-import os
-from apify_client import ApifyClient
-
-client = ApifyClient(os.environ["APIFY_TOKEN"])  # set this to your Apify API token
-
-run_input = {
-    "sources": ["clinicaltrials"],
-    "condition": "diabetes",
-    "maxPages": 5,
-    "onlyChanged": True,
-}
-
-run = client.actor("PkYgfW33Sh6teGXUX").call(run_input=run_input)
-print(f"Run {run['id']} finished with status: {run['status']}")
-
-dataset_items = client.dataset(run["defaultDatasetId"]).list_items().items
-print(f"Delivered {len(dataset_items)} record(s):")
-for item in dataset_items:
-    print(f"- [{item['event_type']}] {item['record_id']}")
-```
+That means useful contributions here are: improving this README, fixing or extending the Python/Node.js examples in `examples/`, or reporting a documentation error via a GitHub issue or PR on this repo. To report a bug in the Actor's actual behavior, request a new source/jurisdiction, or ask a product question, use the Apify Store's own Issues tab on the [Store listing](https://apify.com/stefano_seggio/actor-24-clinical-trials-delta-engine) - that's where the Actor's real maintainer (also the author of this repo) triages requests against the live source.
 
 ---
 

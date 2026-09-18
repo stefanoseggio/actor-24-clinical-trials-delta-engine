@@ -207,7 +207,7 @@ This is a documentation/integration wrapper repo with no local `.actor/input_sch
 
 ### Output
 
-One row per delta event, following the `overview` view in `.actor/dataset_schema.json`.
+One row per delta event, following the `overview` view in the live Actor's own `.actor/dataset_schema.json` on Apify - that file lives with the Actor's closed source, not in this documentation-only repo.
 
 #### Sample Extracted Dataset (JSON)
 

@@ -134,6 +134,61 @@ for (const item of items) {
 
 Runnable copies of the Python and Node.js examples above (CommonJS `require()` variant for Node) live in `examples/run_monitor.py` and `examples/run-monitor.js` in this repo.
 
+## Use this from Claude Desktop, Cursor, or Windsurf (via MCP)
+
+This Actor is also reachable as an MCP server through Apify's own hosted `@apify/actors-mcp-server`, scoped to just this Actor via a `?tools=` query string - not the full Delta Registry fleet.
+
+**Claude Desktop** (via the `mcp-remote` stdio bridge):
+
+```json
+{
+  "mcpServers": {
+    "delta-registry-actor-24-clinical-trials-delta-engine": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.apify.com/?tools=stefano_seggio/actor-24-clinical-trials-delta-engine",
+        "--header",
+        "Authorization: Bearer ${APIFY_TOKEN}"
+      ]
+    }
+  }
+}
+```
+
+**Cursor** (native HTTP transport):
+
+```json
+{
+  "mcpServers": {
+    "delta-registry-actor-24-clinical-trials-delta-engine": {
+      "url": "https://mcp.apify.com/?tools=stefano_seggio/actor-24-clinical-trials-delta-engine",
+      "headers": {
+        "Authorization": "Bearer ${APIFY_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+**Windsurf** (uses `serverUrl`, not `url`):
+
+```json
+{
+  "mcpServers": {
+    "delta-registry-actor-24-clinical-trials-delta-engine": {
+      "serverUrl": "https://mcp.apify.com/?tools=stefano_seggio/actor-24-clinical-trials-delta-engine",
+      "headers": {
+        "Authorization": "Bearer ${env:APIFY_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Replace `${APIFY_TOKEN}` with a real token from [Apify Console → Settings → Integrations](https://console.apify.com/settings/integrations). Note that `mcp-remote` does not expand shell environment variables inside the JSON string itself - paste the literal token and keep this file out of version control; Windsurf's `${env:APIFY_TOKEN}` genuinely does resolve from your environment. For the full 28-actor Delta Registry MCP configuration across all three clients, see [MCP_INTEGRATION.md](https://github.com/stefanoseggio/delta-registry-website/blob/main/MCP_INTEGRATION.md).
+
 ## Input & Output Schema
 
 This is a documentation/integration wrapper repo with no local `.actor/input_schema.json` - the field list below is the real, complete input surface as documented and exercised in this README's own Quickstart examples above.
@@ -187,7 +242,7 @@ An Orange Book `PATENT_EXCLUSIVITY_CHANGE` record instead carries `application_n
 | `scraped_at` | ISO-8601 timestamp of this run. |
 | `is_new` | `true` if this is the first time this `record_id` has been seen. |
 | `source_url` | Direct link back to the record on ClinicalTrials.gov or the Orange Book. |
-| `data_source` | `clinicaltrials-gov` or `orange-book`. |
+| `data_source` | `clinicaltrials-gov` or `openfda-orangebook`. |
 | `nct_id` | ClinicalTrials.gov trial identifier (trial records only). |
 | `brief_title` | The trial's short title (trial records only). |
 | `overall_status` | Current trial status, e.g. `RECRUITING`, `TERMINATED` (trial records only). |
